@@ -1,0 +1,79 @@
+name: teams
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Module tests
+        working-directory: modules/team
+        run: |
+          terraform init -backend=false
+          terraform test
+
+  changed-teams:
+    runs-on: ubuntu-latest
+    outputs:
+      teams: ${{ steps.find.outputs.teams }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find teams whose file changed
+        id: find
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          changed="$(git diff --name-only "$BASE" HEAD)"
+
+          if echo "$changed" | grep -qE '^(modules|live)/'; then
+            # Platform code changed: every team may be affected
+            files="$(ls teams/*.tfvars)"
+          else
+            # Only the team files that changed
+            files="$(echo "$changed" | grep -E '^teams/.*\.tfvars$' || true)"
+          fi
+
+          teams="$(for f in $files; do
+            if [ -f "$f" ]; then basename "$f" .tfvars; fi
+          done | jq -Rnc '[inputs]')"
+
+          echo "Teams: $teams"
+          echo "teams=$teams" >> "$GITHUB_OUTPUT"
+
+  terraform:
+    needs: [test, changed-teams]
+    if: needs.changed-teams.outputs.teams != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        team: ${{ fromJSON(needs.changed-teams.outputs.teams) }}
+    name: ${{ github.event_name == 'push' && 'apply' || 'plan' }} (${{ matrix.team }})
+    concurrency:
+      group: team-${{ matrix.team }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Terraform (mocked, no AWS account)
+        env:
+          TEAM: ${{ matrix.team }}
+          ACTION: ${{ github.event_name == 'push' && 'apply' || 'plan' }}
+        run: |
+          echo "Would run:"
+          echo "  cd live"
+          echo "  terraform init -backend-config=key=teams/$TEAM.tfstate"
+          echo "  terraform $ACTION -lock-timeout=5m -var=team_name=$TEAM -var-file=../teams/$TEAM.tfvars"
