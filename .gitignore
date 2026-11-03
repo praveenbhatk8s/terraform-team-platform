@@ -1,0 +1,12 @@
+# Downloaded providers: rebuilt by `terraform init`
+.terraform/
+
+# State files: can contain secrets, and live in S3, never in git
+*.tfstate
+*.tfstate.*
+
+# Saved plan files
+*.tfplan
+
+# Lock files only belong where Terraform runs (live/), not in the module
+modules/**/.terraform.lock.hcl
