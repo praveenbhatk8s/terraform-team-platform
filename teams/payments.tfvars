@@ -1,4 +1,4 @@
-cost_center = "CC-1042"
+cost_center = "CC-1043"
 
 buckets = [
   { name = "invoices", visibility = "private" },
