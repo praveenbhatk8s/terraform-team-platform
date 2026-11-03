@@ -52,3 +52,42 @@ resource "aws_s3_bucket_policy" "public_read" {
 
   depends_on = [aws_s3_bucket_public_access_block.this]
 }
+
+# ---------- IAM role ----------
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "this" {
+  name = "${var.prefix}-${var.team_name}"
+  tags = local.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "this" {
+  name = "own-buckets-only"
+  role = aws_iam_role.this.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = [for b in local.buckets : "arn:aws:s3:::${b.full_name}"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = [for b in local.buckets : "arn:aws:s3:::${b.full_name}/*"]
+      },
+    ]
+  })
+}
