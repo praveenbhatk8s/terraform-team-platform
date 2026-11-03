@@ -81,7 +81,7 @@ resource "aws_iam_role_policy" "this" {
       {
         Effect   = "Allow"
         Action   = ["s3:ListBucket"]
-        Resource = [for b in local.buckets : "arn:aws:s3:::${b.full_name}"]
+        Resource = ["*"]
       },
       {
         Effect   = "Allow"
