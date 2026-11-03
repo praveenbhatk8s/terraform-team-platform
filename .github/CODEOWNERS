@@ -1,0 +1,7 @@
+# Default: the platform team owns everything not matched below.
+# In a real company this would be a GitHub team, e.g. @acme/platform
+*                         @praveenbhatk8s
+
+# Each team owns its own file.
+# In a real company: /teams/payments.tfvars   @acme/payments
+/teams/payments.tfvars    @praveenbhatk8s
